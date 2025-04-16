@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>India’s Largest Cities Bubble Chart (2020)</title>
+  <script src="https://d3js.org/d3.v4.min.js"></script>
+  <style>
+    body {
+      font-family: "Verdana", sans-serif;
+      background-color: #f9f9f9;
+      margin: 0;
+    }
+
+    #header {
+      text-align: center;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin: 0;
+    }
+
+    .tooltip {
+      position: absolute;
+      background-color: white;
+      border: 1px solid #aaa;
+      border-radius: 5px;
+      padding: 8px;
+      font-size: 13px;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .node circle {
+      stroke: #333;
+      stroke-width: 0.5px;
+    }
+
+    .node circle:hover {
+      stroke-width: 3px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>India’s Largest Cities by Population (2020)</h1>
+  <p>Data: UN World Urbanization Prospects | GitHub Source</p>
+</div>
+
+<div id="my_dataviz"></div>
+
+<script>
+  const width = window.innerWidth;
+  const height = 700;
+  const nodePadding = 3;
+
+  const svg = d3.select("#my_dataviz")
+    .append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+  // Generate colorful scale
+  const generateColors = (n) => {
+    return Array.from({ length: n }, (_, i) =>
+      d3.interpolateRainbow(i / n)
+    );
+  };
+  const color = d3.scaleOrdinal(generateColors(30));
+
+  const simulation = d3.forceSimulation()
+    .force("x", d3.forceX(width / 2).strength(0.05))
+    .force("y", d3.forceY(height / 2).strength(0.05))
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force("charge", d3.forceManyBody().strength(-10));
+
+  const tooltip = d3.select("body")
+    .append("div")
+    .attr("class", "tooltip");
+
+  d3.csv("https://raw.githubusercontent.com/Phapa028/Lab8/refs/heads/main/CityData_WUP2018_all.csv", function(d, i) {
+    d.pop2020 = +d.pop2020;
+    d.radius = Math.sqrt(d.pop2020) * 12; // 🎯 Bigger circles
+    return d;
+  }, function(error, data) {
+    if (error) throw error;
+
+    const indiaData = data.filter(d => d.Country === "India" && d.pop2020 > 0);
+
+    color.domain(indiaData.map(d => d.CityName));
+
+    const node = svg.append("g")
+      .attr("class", "node")
+      .selectAll("circle")
+      .data(indiaData)
+      .enter()
+      .append("circle")
+      .attr("r", d => d.radius)
+      .attr("fill", d => color(d.CityName))
+      .on("mouseover", function(d) {
+        tooltip
+          .style("opacity", 1)
+          .html(`<strong>${d.CityName}</strong><br>${d3.format(",")(d.pop2020)} people`)
+          .style("left", (d3.event.pageX + 10) + "px")
+          .style("top", (d3.event.pageY - 28) + "px");
+      })
+      .on("mousemove", function(d) {
+        tooltip
+          .style("left", (d3.event.pageX + 10) + "px")
+          .style("top", (d3.event.pageY - 28) + "px");
+      })
+      .on("mouseout", function() {
+        tooltip.style("opacity", 0);
+      })
+      .call(d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended)
+      );
+
+    simulation
+      .nodes(indiaData)
+      .force("collide", d3.forceCollide().strength(1).radius(d => d.radius + nodePadding).iterations(1))
+      .on("tick", () => {
+        node
+          .attr("cx", d => d.x)
+          .attr("cy", d => d.y);
+      });
+  });
+
+  function dragstarted(d) {
+    if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+
+  function dragged(d) {
+    d.fx = d3.event.x;
+    d.fy = d3.event.y;
+  }
+
+  function dragended(d) {
+    if (!d3.event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+  }
+</script>
+
+</body>
+</html>
+
